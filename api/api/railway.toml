@@ -1,0 +1,9 @@
+[build]
+builder = "nixpacks"
+buildCommand = "./mvnw clean package -DskipTests"
+
+[deploy]
+startCommand = "java -jar target/*.jar"
+healthcheckPath = "/actuator/health"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
