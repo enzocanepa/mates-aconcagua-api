@@ -32,7 +32,10 @@ public class ProductService {
             product.getImages().forEach(img -> img.setProduct(product));
         if (product.getVariants() != null)
             product.getVariants().forEach(v -> v.setProduct(product));
-        return productRepository.save(product);
+        Product saved = productRepository.save(product);
+        // Recargar con JOIN FETCH para evitar LazyInitializationException al serializar
+        // (open-in-view=false cierra la sesión antes de que Jackson serialice las colecciones)
+        return productRepository.findByIdWithDetails(saved.getId()).orElse(saved);
     }
 
     @Transactional
