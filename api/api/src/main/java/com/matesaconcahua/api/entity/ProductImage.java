@@ -3,8 +3,12 @@ package com.matesaconcahua.api.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 @Data
+@EqualsAndHashCode(exclude = "product")
+@ToString(exclude = "product")
 @Entity
 @Table(name = "product_images")
 public class ProductImage {
