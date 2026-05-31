@@ -3,6 +3,7 @@ package com.matesaconcahua.api.service;
 import com.matesaconcahua.api.entity.Product;
 import com.matesaconcahua.api.entity.Review;
 import com.matesaconcahua.api.entity.User;
+import com.matesaconcahua.api.exception.BusinessException;
 import com.matesaconcahua.api.exception.ResourceNotFoundException;
 import com.matesaconcahua.api.repository.ProductRepository;
 import com.matesaconcahua.api.repository.ReviewRepository;
