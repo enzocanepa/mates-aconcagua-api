@@ -44,10 +44,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGeneric(Exception ex) {
-        // Log detallado para diagnóstico — remover en producción final
-        String msg = ex.getClass().getSimpleName() + ": " + ex.getMessage();
-        if (ex.getCause() != null) msg += " | Causa: " + ex.getCause().getMessage();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", msg));
+                .body(Map.of("error", "Error interno del servidor"));
     }
 }
