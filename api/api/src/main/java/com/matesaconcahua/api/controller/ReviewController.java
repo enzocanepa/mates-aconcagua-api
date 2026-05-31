@@ -23,7 +23,11 @@ public class ReviewController {
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody Map<String, Object> body, Authentication auth) {
-        String userId   = (String) auth.getPrincipal();
+        // C-04: validar campos requeridos antes de castear para evitar NPE
+        if (body.get("productId") == null || body.get("rating") == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Faltan campos: productId, rating"));
+
+        String userId     = (String) auth.getPrincipal();
         Integer productId = ((Number) body.get("productId")).intValue();
         Integer rating    = ((Number) body.get("rating")).intValue();
         String comment    = (String) body.get("comment");

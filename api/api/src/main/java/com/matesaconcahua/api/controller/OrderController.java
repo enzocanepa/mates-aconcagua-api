@@ -26,13 +26,19 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<?> createOrder(@RequestBody Map<String, Object> body, Authentication auth) {
+        // C-03: validar campos requeridos antes de castear
+        if (body.get("cart") == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "Falta el campo: cart"));
+
         String userId = (String) auth.getPrincipal();
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> cartItems = (List<Map<String, Object>>) body.get("cart");
-        double total = ((Number) body.get("total")).doubleValue();
+
+        if (cartItems.isEmpty())
+            return ResponseEntity.badRequest().body(Map.of("error", "El carrito no puede estar vacío"));
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of("order", orderService.create(userId, cartItems, total)));
+                .body(Map.of("order", orderService.create(userId, cartItems)));
     }
 
     @GetMapping("/admin")

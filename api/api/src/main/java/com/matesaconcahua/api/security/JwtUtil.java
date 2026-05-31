@@ -2,6 +2,7 @@ package com.matesaconcahua.api.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,13 @@ public class JwtUtil {
 
     @Value("${jwt.expiration:86400000}")
     private long expiration;
+
+    // M-03: validar longitud mínima al arrancar para detectar configs incorrectas
+    @PostConstruct
+    public void validate() {
+        if (secret.getBytes(StandardCharsets.UTF_8).length < 32)
+            throw new IllegalStateException("jwt.secret debe tener al menos 32 bytes");
+    }
 
     private SecretKey getKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));

@@ -40,18 +40,45 @@ public class OrderService {
     }
 
     @Transactional
-    public Order create(String userId, List<Map<String, Object>> cartItems, double totalRaw) {
+    public Order create(String userId, List<Map<String, Object>> cartItems) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
 
-        validateStock(cartItems);
-
         Order order = new Order();
         order.setUser(user);
-        order.setTotal(BigDecimal.valueOf(totalRaw));
         order.setStatus(Order.Status.pending);
 
-        List<OrderItem> items = buildItems(order, cartItems);
+        // C-01 + C-02: precios desde DB con bloqueo pesimista, validación y descuento
+        // en una sola pasada para evitar race conditions
+        List<OrderItem> items = new ArrayList<>();
+        BigDecimal serverTotal = BigDecimal.ZERO;
+
+        for (Map<String, Object> ci : cartItems) {
+            Integer productId = ((Number) ci.get("id")).intValue();
+            int qty           = ((Number) ci.get("quantity")).intValue();
+
+            // Bloqueo pesimista: impide que otra transacción lea/escriba el mismo producto
+            Product product = productRepository.findByIdForUpdate(productId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Producto", productId));
+
+            if (product.getStock() != null && product.getStock() < qty)
+                throw new BusinessException("Stock insuficiente para: " + product.getName());
+
+            if (product.getStock() != null)
+                product.setStock(product.getStock() - qty);
+            productRepository.save(product);
+
+            OrderItem item = new OrderItem();
+            item.setOrder(order);
+            item.setProduct(product);
+            item.setQuantity(qty);
+            item.setUnitPrice(product.getPrice()); // C-01: precio siempre desde la DB
+            items.add(item);
+
+            serverTotal = serverTotal.add(product.getPrice().multiply(BigDecimal.valueOf(qty)));
+        }
+
+        order.setTotal(serverTotal); // A-02: total calculado en el servidor
         order.setItems(items);
 
         return orderRepository.save(order);
@@ -66,37 +93,5 @@ public class OrderService {
             throw new BusinessException("Estado inválido: " + status);
         }
         return orderRepository.save(order);
-    }
-
-    private void validateStock(List<Map<String, Object>> cartItems) {
-        for (Map<String, Object> ci : cartItems) {
-            Integer productId = ((Number) ci.get("id")).intValue();
-            int qty           = ((Number) ci.get("quantity")).intValue();
-            Product product   = productRepository.findById(productId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Producto", productId));
-            if (product.getStock() != null && product.getStock() < qty)
-                throw new BusinessException("Stock insuficiente para: " + product.getName());
-        }
-    }
-
-    private List<OrderItem> buildItems(Order order, List<Map<String, Object>> cartItems) {
-        List<OrderItem> items = new ArrayList<>();
-        for (Map<String, Object> ci : cartItems) {
-            Integer productId = ((Number) ci.get("id")).intValue();
-            int qty           = ((Number) ci.get("quantity")).intValue();
-            Product product   = productRepository.findById(productId).orElseThrow();
-
-            if (product.getStock() != null)
-                product.setStock(product.getStock() - qty);
-            productRepository.save(product);
-
-            OrderItem item = new OrderItem();
-            item.setOrder(order);
-            item.setProduct(product);
-            item.setQuantity(qty);
-            item.setUnitPrice(BigDecimal.valueOf(((Number) ci.get("price")).doubleValue()));
-            items.add(item);
-        }
-        return items;
     }
 }

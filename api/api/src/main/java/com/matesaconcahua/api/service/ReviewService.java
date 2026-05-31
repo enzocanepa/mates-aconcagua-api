@@ -27,6 +27,10 @@ public class ReviewService {
 
     @Transactional
     public Review create(String userId, Integer productId, Integer rating, String comment) {
+        // A-05: validar rango de rating
+        if (rating < 1 || rating > 5)
+            throw new BusinessException("El rating debe estar entre 1 y 5");
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
         Product product = productRepository.findById(productId)
