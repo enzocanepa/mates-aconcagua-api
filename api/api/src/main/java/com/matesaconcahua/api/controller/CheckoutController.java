@@ -3,25 +3,32 @@ package com.matesaconcahua.api.controller;
 import com.mercadopago.MercadoPagoConfig;
 import com.mercadopago.client.preference.*;
 import com.mercadopago.resources.preference.Preference;
+import com.matesaconcahua.api.entity.Product;
+import com.matesaconcahua.api.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/checkout")
 @RequiredArgsConstructor
 public class CheckoutController {
 
+    private static final Logger log = LoggerFactory.getLogger(CheckoutController.class);
+
+    private final ProductRepository productRepository;
+
     @Value("${mercadopago.access-token}")
     private String mpAccessToken;
+
+    @Value("${app.base-url}")
+    private String appBaseUrl;
 
     @PostMapping("/create-preference")
     public ResponseEntity<?> createPreference(@RequestBody Map<String, Object> body,
@@ -35,43 +42,39 @@ public class CheckoutController {
             @SuppressWarnings("unchecked")
             Map<String, String> payer = (Map<String, String>) body.get("payer");
 
-            @SuppressWarnings("unchecked")
-            Map<String, String> shipping = (Map<String, String>) body.get("shipping");
-
-            String baseUrl = (String) body.getOrDefault("baseUrl", "http://localhost:5173");
-
-            // Armar items de la preferencia
+            // Validate prices from DB — never trust client-sent prices
             List<PreferenceItemRequest> items = new ArrayList<>();
             for (Map<String, Object> ci : cartItems) {
-                double price    = ((Number) ci.get("price")).doubleValue();
-                int    quantity = ((Number) ci.get("quantity")).intValue();
+                int productId = ((Number) ci.get("id")).intValue();
+                int quantity  = ((Number) ci.get("quantity")).intValue();
+
+                Product product = productRepository.findById(productId)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Producto no encontrado: " + productId));
 
                 items.add(PreferenceItemRequest.builder()
-                        .id(String.valueOf(ci.get("id")))
-                        .title(String.valueOf(ci.get("name")))
-                        .description(ci.getOrDefault("description", "").toString())
-                        .pictureUrl(ci.getOrDefault("image", "").toString())
-                        .categoryId(ci.getOrDefault("category", "").toString())
+                        .id(String.valueOf(product.getId()))
+                        .title(product.getName())
+                        .description(product.getDescription() != null ? product.getDescription() : "")
+                        .pictureUrl(product.getImage() != null ? product.getImage() : "")
+                        .categoryId(product.getCategory().name())
                         .quantity(quantity)
-                        .unitPrice(BigDecimal.valueOf(price))
+                        .unitPrice(product.getPrice())
                         .currencyId("ARS")
                         .build());
             }
 
-            // Payer
             PreferencePayerRequest payerRequest = PreferencePayerRequest.builder()
                     .name(payer.getOrDefault("name", ""))
                     .email(payer.getOrDefault("email", ""))
                     .build();
 
-            // Back URLs
             PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
-                    .success(baseUrl + "/checkout/exito")
-                    .failure(baseUrl + "/checkout/error")
-                    .pending(baseUrl + "/checkout/pendiente")
+                    .success(appBaseUrl + "/checkout/exito")
+                    .failure(appBaseUrl + "/checkout/error")
+                    .pending(appBaseUrl + "/checkout/pendiente")
                     .build();
 
-            // Preferencia completa
             PreferenceRequest request = PreferenceRequest.builder()
                     .items(items)
                     .payer(payerRequest)
@@ -82,26 +85,24 @@ public class CheckoutController {
             PreferenceClient client = new PreferenceClient();
             Preference preference   = client.create(request);
 
-            // TEST- credentials → sandbox, APP_USR- credentials → production
             boolean isSandbox = mpAccessToken.startsWith("TEST-");
             String initPoint = (isSandbox && preference.getSandboxInitPoint() != null)
                     ? preference.getSandboxInitPoint()
                     : preference.getInitPoint();
 
             return ResponseEntity.ok(Map.of(
-                    "init_point",   initPoint,
+                    "init_point",    initPoint,
                     "preference_id", preference.getId()
             ));
 
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (com.mercadopago.exceptions.MPApiException e) {
-            System.err.println("MP API error status: " + e.getStatusCode());
-            System.err.println("MP API error body: "   + e.getApiResponse().getContent());
-            return ResponseEntity.status(500)
-                    .body(Map.of("error", "MercadoPago: " + e.getApiResponse().getContent()));
+            log.error("MP API error {}: {}", e.getStatusCode(), e.getApiResponse().getContent());
+            return ResponseEntity.status(502).body(Map.of("error", "Error al procesar el pago. Intentá nuevamente."));
         } catch (Exception e) {
-            System.err.println("MercadoPago error: " + e.getMessage());
-            return ResponseEntity.status(500)
-                    .body(Map.of("error", "Error al crear la preferencia: " + e.getMessage()));
+            log.error("Checkout error: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Error interno. Intentá nuevamente."));
         }
     }
 }
