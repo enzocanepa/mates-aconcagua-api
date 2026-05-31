@@ -4,7 +4,8 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Data
 @Entity
@@ -40,10 +41,10 @@ public class Product {
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @OrderBy("position ASC")
-    private List<ProductImage> images;
+    private Set<ProductImage> images = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
-    private List<ProductVariant> variants;
+    private Set<ProductVariant> variants = new LinkedHashSet<>();
 
     @PrePersist
     public void prePersist() {
