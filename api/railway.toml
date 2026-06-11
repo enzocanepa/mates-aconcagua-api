@@ -1,5 +1,5 @@
 [build]
-buildCommand = "./mvnw clean package -DskipTests"
+buildCommand = "./mvnw clean package"
 
 [deploy]
 startCommand = "java -jar target/*.jar"

@@ -39,6 +39,10 @@ public class CheckoutController {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> cartItems = (List<Map<String, Object>>) body.get("items");
 
+            if (cartItems == null || cartItems.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "El carrito no puede estar vacío"));
+            }
+
             @SuppressWarnings("unchecked")
             Map<String, String> payer = (Map<String, String>) body.get("payer");
 
@@ -47,6 +51,10 @@ public class CheckoutController {
             for (Map<String, Object> ci : cartItems) {
                 int productId = ((Number) ci.get("id")).intValue();
                 int quantity  = ((Number) ci.get("quantity")).intValue();
+
+                if (quantity <= 0) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "La cantidad debe ser mayor a cero"));
+                }
 
                 Product product = productRepository.findById(productId)
                         .orElseThrow(() -> new IllegalArgumentException(
