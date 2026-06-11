@@ -26,4 +26,7 @@ public class ProductImage {
     private String url;
 
     private Integer position = 0;
+
+    @Column(name = "variant_name")
+    private String variantName;
 }

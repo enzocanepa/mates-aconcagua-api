@@ -39,5 +39,5 @@ public class Order {
         if (createdAt == null) createdAt = LocalDateTime.now();
     }
 
-    public enum Status { pending, completed, cancelled }
+    public enum Status { pending, shipped, completed, cancelled }
 }
