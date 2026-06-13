@@ -30,13 +30,6 @@ public class User {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @JsonIgnore
-    @Column(name = "reset_code")
-    private String resetCode;
-
-    @Column(name = "reset_code_expiry")
-    private LocalDateTime resetCodeExpiry;
-
     @PrePersist
     public void prePersist() {
         if (id == null) id = UUID.randomUUID().toString();
