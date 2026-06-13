@@ -304,4 +304,4 @@ Todas las respuestas de error siguen el formato:
 ## Contacto
 
 **Mates Aconcagua** — Mendoza, Argentina  
-Email: [lorenzocona14@gmail.com](mailto:lorenzocona14@gmail.com)
+Email: [enzocanepa02@gmail.com](mailto:enzocanepa02@gmail.com)
