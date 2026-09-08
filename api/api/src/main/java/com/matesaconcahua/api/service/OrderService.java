@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -40,13 +41,22 @@ public class OrderService {
     }
 
     @Transactional
-    public Order create(String userId, List<Map<String, Object>> cartItems) {
+    public Order create(String userId, List<Map<String, Object>> cartItems, String externalReference) {
+        // Idempotencia: si ya existe una orden para esta referencia (ej. el usuario
+        // recargó la página de resultado del pago), devolvemos la existente en vez
+        // de crear una duplicada y descontar stock dos veces.
+        if (externalReference != null && !externalReference.isBlank()) {
+            Optional<Order> existing = orderRepository.findByExternalReference(externalReference);
+            if (existing.isPresent()) return existing.get();
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario", userId));
 
         Order order = new Order();
         order.setUser(user);
         order.setStatus(Order.Status.pending);
+        order.setExternalReference(externalReference);
 
         // C-01 + C-02: precios desde DB con bloqueo pesimista, validación y descuento
         // en una sola pasada para evitar race conditions

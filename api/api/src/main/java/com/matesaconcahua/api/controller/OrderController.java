@@ -37,8 +37,10 @@ public class OrderController {
         if (cartItems.isEmpty())
             return ResponseEntity.badRequest().body(Map.of("error", "El carrito no puede estar vacío"));
 
+        String externalReference = (String) body.get("externalReference");
+
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of("order", orderService.create(userId, cartItems)));
+                .body(Map.of("order", orderService.create(userId, cartItems, externalReference)));
     }
 
     @GetMapping("/admin")

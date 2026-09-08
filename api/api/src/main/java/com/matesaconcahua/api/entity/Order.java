@@ -30,6 +30,12 @@ public class Order {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "external_reference")
+    private String externalReference;
+
+    @Column(name = "payment_id")
+    private String paymentId;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private List<OrderItem> items;
 

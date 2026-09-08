@@ -1,10 +1,16 @@
 package com.matesaconcahua.api.controller;
 
 import com.mercadopago.MercadoPagoConfig;
+import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.client.preference.*;
+import com.mercadopago.resources.payment.Payment;
 import com.mercadopago.resources.preference.Preference;
+import com.matesaconcahua.api.entity.Order;
 import com.matesaconcahua.api.entity.Product;
+import com.matesaconcahua.api.repository.OrderRepository;
 import com.matesaconcahua.api.repository.ProductRepository;
+import com.matesaconcahua.api.service.N8nNotificationService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,12 +29,17 @@ public class CheckoutController {
     private static final Logger log = LoggerFactory.getLogger(CheckoutController.class);
 
     private final ProductRepository productRepository;
+    private final OrderRepository orderRepository;
+    private final N8nNotificationService n8nNotificationService;
 
     @Value("${mercadopago.access-token}")
     private String mpAccessToken;
 
     @Value("${app.base-url}")
     private String appBaseUrl;
+
+    @Value("${app.api-base-url}")
+    private String apiBaseUrl;
 
     @PostMapping("/create-preference")
     public ResponseEntity<?> createPreference(@RequestBody Map<String, Object> body,
@@ -83,11 +94,14 @@ public class CheckoutController {
                     .pending(appBaseUrl + "/checkout/pendiente")
                     .build();
 
+            String externalReference = UUID.randomUUID().toString();
+
             PreferenceRequest request = PreferenceRequest.builder()
                     .items(items)
                     .payer(payerRequest)
                     .backUrls(backUrls)
-                    .externalReference(UUID.randomUUID().toString())
+                    .externalReference(externalReference)
+                    .notificationUrl(apiBaseUrl + "/api/checkout/webhook")
                     .build();
 
             PreferenceClient client = new PreferenceClient();
@@ -112,5 +126,61 @@ public class CheckoutController {
             log.error("Checkout error: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Error interno. Intentá nuevamente."));
         }
+    }
+
+    // Notificación server-to-server de Mercado Pago: fuente de verdad del estado del
+    // pago, independiente de que el navegador del cliente vuelva a cargar la página.
+    @PostMapping("/webhook")
+    public ResponseEntity<Void> webhook(HttpServletRequest request) {
+        try {
+            String type = request.getParameter("type") != null
+                    ? request.getParameter("type")
+                    : request.getParameter("topic");
+            String paymentId = request.getParameter("data.id") != null
+                    ? request.getParameter("data.id")
+                    : request.getParameter("id");
+
+            if (!"payment".equals(type) || paymentId == null)
+                return ResponseEntity.ok().build();
+
+            MercadoPagoConfig.setAccessToken(mpAccessToken);
+            Payment payment = new PaymentClient().get(Long.valueOf(paymentId));
+
+            String externalReference = payment.getExternalReference();
+            if (externalReference == null) return ResponseEntity.ok().build();
+
+            Order order = orderRepository.findByExternalReference(externalReference).orElse(null);
+            if (order == null) {
+                log.warn("Webhook de MP: no se encontró orden para externalReference {}", externalReference);
+                return ResponseEntity.ok().build();
+            }
+
+            Order.Status previousStatus = order.getStatus();
+            Order.Status newStatus = mapMpStatus(payment.getStatus());
+
+            if (newStatus == previousStatus) return ResponseEntity.ok().build(); // ya procesado, evita duplicados
+
+            order.setStatus(newStatus);
+            order.setPaymentId(String.valueOf(payment.getId()));
+            orderRepository.save(order);
+
+            if (newStatus == Order.Status.completed)
+                n8nNotificationService.notificarCompraExitosa(order);
+            else if (newStatus == Order.Status.cancelled)
+                n8nNotificationService.notificarCompraFallida(order, "Pago rechazado por Mercado Pago");
+
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Error procesando webhook de Mercado Pago: {}", e.getMessage(), e);
+            return ResponseEntity.ok().build(); // 200 siempre para que MP no reintente indefinidamente
+        }
+    }
+
+    private Order.Status mapMpStatus(String mpStatus) {
+        return switch (mpStatus) {
+            case "approved" -> Order.Status.completed;
+            case "rejected", "cancelled" -> Order.Status.cancelled;
+            default -> Order.Status.pending; // pending, in_process, authorized, etc.
+        };
     }
 }

@@ -41,6 +41,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET,  "/api/products/**").permitAll()
                 .requestMatchers(HttpMethod.GET,  "/api/reviews/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/checkout/webhook").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/checkout/**").authenticated()
                 .requestMatchers(HttpMethod.POST,   "/api/products/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT,    "/api/products/**").hasRole("ADMIN")
