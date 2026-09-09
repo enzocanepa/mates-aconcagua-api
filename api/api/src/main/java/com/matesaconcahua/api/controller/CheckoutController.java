@@ -109,13 +109,11 @@ public class CheckoutController {
             PreferenceClient client = new PreferenceClient();
             Preference preference   = client.create(request);
 
-            boolean isSandbox = mpAccessToken.startsWith("TEST-");
-            String initPoint = (isSandbox && preference.getSandboxInitPoint() != null)
-                    ? preference.getSandboxInitPoint()
-                    : preference.getInitPoint();
-
+            // MP unificó el esquema: lo que define si el entorno es de prueba son las
+            // credenciales (TEST- vs APP_USR-), no el dominio. sandbox_init_point/el dominio
+            // sandbox.mercadopago.com.ar quedaron legacy y dan 404/loops de redirect.
             return ResponseEntity.ok(Map.of(
-                    "init_point",    initPoint,
+                    "init_point",    preference.getInitPoint(),
                     "preference_id", preference.getId()
             ));
 
