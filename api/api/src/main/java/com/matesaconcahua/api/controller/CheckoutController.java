@@ -101,7 +101,9 @@ public class CheckoutController {
                     .payer(payerRequest)
                     .backUrls(backUrls)
                     .externalReference(externalReference)
-                    .notificationUrl(apiBaseUrl + "/api/checkout/webhook")
+                    // Temporalmente deshabilitado para descartar que la validación de MP sobre
+                    // esta URL esté activando controles antifraude más estrictos en el checkout.
+                    // .notificationUrl(apiBaseUrl + "/api/checkout/webhook")
                     .build();
 
             PreferenceClient client = new PreferenceClient();
