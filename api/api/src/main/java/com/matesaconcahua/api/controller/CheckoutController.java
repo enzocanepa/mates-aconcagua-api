@@ -112,6 +112,8 @@ public class CheckoutController {
             // MP unificó el esquema: lo que define si el entorno es de prueba son las
             // credenciales (TEST- vs APP_USR-), no el dominio. sandbox_init_point/el dominio
             // sandbox.mercadopago.com.ar quedaron legacy y dan 404/loops de redirect.
+            log.info("INIT_POINT -> {}", preference.getInitPoint());
+            log.info("COLLECTOR_ID -> {}", preference.getCollectorId());
             return ResponseEntity.ok(Map.of(
                     "init_point",    preference.getInitPoint(),
                     "preference_id", preference.getId()
